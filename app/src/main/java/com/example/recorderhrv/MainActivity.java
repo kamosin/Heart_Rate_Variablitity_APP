@@ -118,7 +118,7 @@ public class MainActivity extends AppCompatActivity implements Serializable{
             public void onClick(View v) {
                 if(CheckPermissions()) {
                     startRecording();
-                    Toast.makeText(getApplicationContext(), "Rozpoczeto nagrywanie", Toast.LENGTH_LONG).show();
+                    Toast.makeText(getApplicationContext(), "Rozpoczęto nagrywanie", Toast.LENGTH_LONG).show();
                     btnAnalyze.setEnabled(true);
 
                 }

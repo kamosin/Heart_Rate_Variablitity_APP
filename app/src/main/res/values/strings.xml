@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">RecorderHRV</string>
+    <string name="title_activity_statistics">Statistics</string>
+    <string name="tab_text_1">Statystyki</string>
+    <string name="tab_text_2">Histogram</string>
+    <string name="tab_text_3">Wykres</string>
+</resources>

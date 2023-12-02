@@ -84,9 +84,6 @@ public class MainActivity extends AppCompatActivity implements Serializable{
         btnPlot = (Button)findViewById(R.id.wykres);
         btnAnalyze = (Button)findViewById(R.id.analyze);
 
-        audioRecorder = new AudioRecord(MediaRecorder.AudioSource.CAMCORDER,
-                RECORDER_SAMPLERATE, RECORDER_CHANNELS,
-                RECORDER_AUDIO_ENCODING, bufferSizeInBytes);
 
 
         btnStats.setOnClickListener(new View.OnClickListener() {
@@ -117,6 +114,11 @@ public class MainActivity extends AppCompatActivity implements Serializable{
             @Override
             public void onClick(View v) {
                 if(CheckPermissions()) {
+                    if(audioRecorder ==null){
+                        audioRecorder = new AudioRecord(MediaRecorder.AudioSource.CAMCORDER,
+                                RECORDER_SAMPLERATE, RECORDER_CHANNELS,
+                                RECORDER_AUDIO_ENCODING, bufferSizeInBytes);
+                    }
                     startRecording();
                     Toast.makeText(getApplicationContext(), "Rozpoczęto nagrywanie", Toast.LENGTH_LONG).show();
                     btnAnalyze.setEnabled(true);
@@ -241,12 +243,12 @@ public class MainActivity extends AppCompatActivity implements Serializable{
         double odstep=0;
         for(int n =1; n<index.size(); n++){
 
-                x2 = Double.valueOf(window)*Double.valueOf(index.get(n));
-                odstep = x2-x1;
-                odstep = 1000*odstep/RECORDER_SAMPLERATE;
-                double ods = Math.round(odstep);
-                time_intervals.add(ods);
-                x1=x2;
+            x2 = Double.valueOf(window)*Double.valueOf(index.get(n));
+            odstep = x2-x1;
+            odstep = 1000*odstep/RECORDER_SAMPLERATE;
+            double ods = Math.round(odstep);
+            time_intervals.add(ods);
+            x1=x2;
         }
         double sum=0;
         mean=0;

@@ -5,11 +5,13 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.view.View;
@@ -17,13 +19,18 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.Serializable;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
@@ -44,15 +51,32 @@ import be.tarsos.dsp.io.TarsosDSPAudioFormat;
 import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
 import static android.Manifest.permission.RECORD_AUDIO;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
 public class MainActivity extends AppCompatActivity implements Serializable{
     Thread recordingThread;
+
+    final Long UserID = 1L;
+
+    public static Context context;
+
+    HRVDataSender sender;
     boolean isRecording = false;
 
     List<Double> time_intervals = new ArrayList<>();
     Double maxInterval;
     Double minInterval;
-    double SDNN;
-    double MSSD;
+    Integer BPM =0;
+    Double SDNN;
+    Double MSSD;
     int numbersOfIntervals;
     double mean;
 
@@ -74,10 +98,11 @@ public class MainActivity extends AppCompatActivity implements Serializable{
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        context = getApplicationContext();
         setContentView(R.layout.activity_main);
         text = (TextView)findViewById(R.id.textView);
         text2 = (TextView)findViewById(R.id.leftTime);
-        text.setText("30");
+        text.setText("10");
         btnRecord = (Button)findViewById(R.id.btnRecord);
         btnStats = (Button)findViewById(R.id.statistics);
         btnHistogram = (Button)findViewById(R.id.button);
@@ -136,10 +161,136 @@ public class MainActivity extends AppCompatActivity implements Serializable{
             @Override
             public void onClick(View v) {
                 analyzePCM();
+                try {
+                    new PostData().execute(prepareJson());
+                    // on below line displaying a toast message.
+                    Toast.makeText(MainActivity.this, "Data has been posted to the API.", Toast.LENGTH_SHORT).show();
+
+                } catch (JSONException e) {
+                    // on below line handling the exception.
+                    e.printStackTrace();
+                    Toast.makeText(MainActivity.this, "Fail to post the data : " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                }
             }
         });
     }
 
+
+
+    class PostData extends AsyncTask<String, Void, String> {
+
+
+
+        @Override
+        protected String doInBackground(String... strings) {
+
+            try {
+
+                // on below line creating a url to post the data.
+                URL url = new URL("http://192.168.50.121:8082/api/heartbeat-data");
+
+                // on below line opening the connection.
+                HttpURLConnection client = (HttpURLConnection) url.openConnection();
+
+                // on below line setting method as post.
+                client.setRequestMethod("POST");
+
+                // on below line setting content type and accept type.
+                client.setRequestProperty("Content-Type", "application/json");
+                client.setRequestProperty("Accept", "application/json");
+
+                // on below line setting client.
+                client.setDoOutput(true);
+
+                // on below line we are creating an output stream and posting the data.
+                try (OutputStream os = client.getOutputStream()) {
+                    byte[] input = strings[0].getBytes("utf-8");
+                    os.write(input, 0, input.length);
+                }
+
+                // on below line creating and initializing buffer reader.
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(client.getInputStream(), "utf-8"))) {
+
+                    // on below line creating a string builder.
+                    StringBuilder response = new StringBuilder();
+
+                    // on below line creating a variable for response line.
+                    String responseLine = null;
+
+                    // on below line writing the response
+                    while ((responseLine = br.readLine()) != null) {
+                        response.append(responseLine.trim());
+                    }
+
+
+
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+
+            }
+            return null;
+        }
+    }
+
+
+    String responseData;
+    private String prepareJson() throws JSONException {
+
+        // Tworzenie obiektu JSON
+        JSONObject jsonObject = new JSONObject();
+
+        Long epochDate = System.currentTimeMillis();
+
+        // Dodawanie danych do obiektu JSON
+        jsonObject.put("epochDate", epochDate);
+        jsonObject.put("beatsPerMinute", BPM);
+        jsonObject.put("mssd", MSSD);
+        jsonObject.put("sdnn", SDNN);
+        jsonObject.put("userId", UserID);
+
+        // Zwracanie JSON jako string
+        return jsonObject.toString();
+    }
+
+    private void postDataUsingVolley(JSONObject jsonBody) {
+        // on below line specifying the url at which we have to make a post request
+        String url = "http://192.168.50.121:8082/heartbeat-data";
+        // creating a new variable for our request queue
+        RequestQueue queue = Volley.newRequestQueue(MainActivity.this);
+        // making a string request on below line.
+        StringRequest request = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String response) {
+
+                // setting response to text view.
+                responseData = ("Response from the API is :" + response);
+                // displaying toast message.
+                Toast.makeText(MainActivity.this, "Data posted succesfully..", Toast.LENGTH_SHORT).show();
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                // handling error on below line.
+                Toast.makeText(MainActivity.this, "Fail to get response..", Toast.LENGTH_SHORT).show();
+            }
+        }) {
+
+            @Override
+            public byte[] getBody() {
+                return jsonBody.toString().getBytes();
+            }
+
+            @Override
+            public String getBodyContentType() {
+                return "application/json";
+            }
+        };
+        // adding request to queue to post the data.
+        queue.add(request);
+    }
     public void openActivityStats(){
 
         Intent intent = new Intent(this, MainActivity4.class);
@@ -257,7 +408,7 @@ public class MainActivity extends AppCompatActivity implements Serializable{
         }
         mean = sum/time_intervals.size();
 
-        double BPM = Math.round(60000/mean);
+        BPM = (int) Math.round(60000/mean);
 
         String s = String.valueOf(BPM);
 
@@ -375,7 +526,7 @@ public class MainActivity extends AppCompatActivity implements Serializable{
                 int counter = 0;
                 int x =1;
                 int turn_off = 0;
-                int left = 30;
+                int left = 10;
                 String z;
                 int second = RECORDER_SAMPLERATE/(bufferSizeInBytes/2);
                 String filepath = Environment.getExternalStorageDirectory().getPath();
@@ -394,7 +545,7 @@ public class MainActivity extends AppCompatActivity implements Serializable{
                         counter++;
                         turn_off++;
                         if (counter >second ){
-                            if(turn_off>second*30) {
+                            if(turn_off>second*10) {
                                 left--;
                                 stopRecording();
                             }
